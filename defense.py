@@ -1,7 +1,9 @@
 import openpyxl
 import random
 from datetime import datetime, timedelta
-
+import pandas as pd
+from datetime import timedelta, datetime
+import openpyxl
 class Defense():
     def __init__(self, surname, name, thesis, degree, form, speciality, promoter, reviewer):
         self.surname = surname
@@ -14,30 +16,30 @@ class Defense():
         self.reviewer = reviewer  # Academic class instance
 
 class Slot():
-    def __init__(self, date, hour, duration):
+    def __init__(self, date, hour, duration, chairman, hall_no = 1):
         self.date = date
         self.hour = hour
         self.duration = duration
-
-class DefenseTerm():
-    def __init__(self, defense, slot, chairman, hall_no = 1):
-        self.defense = defense
-        self.slot = slot
         self.chairman = chairman
         self.hall = hall_no
 
+class DefenseTerm():
+    def __init__(self, defense, slot):
+        self.defense = defense
+        self.slot = slot
+
     def return_academics(self):
-        return [self.chairman, self.defense.promoter, self.defense.reviewer]
-    def is_academic_in_defense(self,academic):
-        if academic in self.return_academics():
-            return True
-        return False
-    def check_academics_collisions(self,other):
-        colisions = 0
+        return [self.slot.chairman, self.defense.promoter, self.defense.reviewer]
+
+    def is_academic_in_defense(self, academic):
+        return academic in self.return_academics()
+
+    def check_academics_collisions(self, other):
+        collisions = 0
         for i in other.return_academics():
-            if self.is_academic_in_defense():
-                colisions += 1
-        return colisions
+            if self.is_academic_in_defense(i):
+                collisions += 1
+        return collisions
 
 class DefenseList():
     def __init__(self, filename):
@@ -58,7 +60,6 @@ class DefenseList():
 
         academics_list = [Academic(academic_name) for academic_name in academics_set]
 
-        # Create list of defenses
         defense_list = []
         for row in sheet.iter_rows(min_row=2, values_only=True):
             surname, name, thesis, degree, form, speciality, promoter_name, reviewer_name = map(
@@ -79,8 +80,6 @@ class DefenseList():
 
         return academics_list, defense_list
 
-import pandas as pd
-
 class DefensesTermsList():
     def __init__(self, defenses_terms):
         self.defenses_terms = defenses_terms
@@ -91,17 +90,16 @@ class DefensesTermsList():
                 f"{term.defense.surname} {term.defense.name} - Date: {term.date}, Hour: {term.hour}, Chairman: {term.chairman}")
 
     def save_to_xlsx(self, filename):
-        # Utwórz DataFrame z informacjami o obronach
         data = {
             'Surname': [term.defense.surname for term in self.defenses_terms],
             'Name': [term.defense.name for term in self.defenses_terms],
             'Date': [term.date for term in self.defenses_terms],
             'Hour': [term.hour for term in self.defenses_terms],
-            'Chairman': [term.chairman for term in self.defenses_terms]
+            'Chairman': [term.chairman for term in self.defenses_terms],
+            'Promoter':[term.defense.promoter for term in self.defenses_terms],
+            'Reviewer':[term.defense.reviewer for term in self.defenses_terms]
         }
         df = pd.DataFrame(data)
-
-        # Zapisz DataFrame do pliku Excel
         df.to_excel(filename, index=False)
 
     def mix_value(self):
@@ -154,15 +152,6 @@ class DefensesTermsList():
         return value
 
 
-from datetime import timedelta, datetime
-import openpyxl
-
-class Slot:
-    def __init__(self, date, start_time, duration):
-        self.date = date
-        self.start_time = start_time
-        self.duration = duration
-
 class SlotsList:
     def __init__(self, filename):
         self.filename = filename
@@ -176,66 +165,67 @@ class SlotsList:
             sheet = workbook.active
 
             for row in sheet.iter_rows(min_row=2, values_only=True):
-                date, start_time, duration = row[:3]
-                slot = Slot(date, start_time, duration)
+                date, start_time, duration,chairman, hall_no = row[:5]
+                slot = Slot(date, start_time, duration, chairman, hall_no)
                 slots.append(slot)
 
         except Exception as e:
-            print(f"Error loading data from file: {e}")
+            print(f"Error loading slots from file: {e}")
 
         return slots
 
-    def save_data_to_file(self):
-        try:
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
-            sheet.append(['Date', 'Start Time', 'Duration'])
-
-            for slot in self.slots:
-                sheet.append([slot.date, slot.start_time, slot.duration])
-
-            workbook.save(self.filename)
-
-        except Exception as e:
-            print(f"Error saving data to file: {e}")
-
-    def set_start_h(self, start_hour):
-        for slot in self.slots:
-            slot.start_time = f"{start_hour:02}:00:00"
-
-    def set_end_h(self, end_hour):
-        for slot in self.slots:
-            end_time = datetime.strptime(slot.start_time, "%H:%M:%S") + timedelta(hours=end_hour)
-            slot.start_time = end_time.strftime("%H:%M:%S")
-
-    def set_slot_duration(self, duration_minutes):
-        self.slot_duration = timedelta(minutes=duration_minutes)
-
-    def set_break(self, start_hour, duration_minutes):
-        break_slot = Slot("", f"{start_hour:02}:00:00", timedelta(minutes=duration_minutes))
-        self.slots.append(break_slot)
-
-    def generate_new_slots(self, start_hour, end_hour, pause=False):
-        new_slots = []
-        for slot in self.slots:
-            current_time = datetime.strptime(slot.start_time, "%H:%M:%S")
-            while current_time.hour < end_hour:
-                new_slots.append(Slot(slot.date, current_time.strftime("%H:%M:%S"), self.slot_duration))
-                current_time += self.slot_duration
-        self.slots = new_slots
+    # def save_data_to_file(self):
+    #     try:
+    #         workbook = openpyxl.Workbook()
+    #         sheet = workbook.active
+    #         sheet.append(['Date', 'Start Time', 'Duration'])
+    #
+    #         for slot in self.slots:
+    #             sheet.append([slot.date, slot.start_time, slot.duration])
+    #
+    #         workbook.save(self.filename)
+    #
+    #     except Exception as e:
+    #         print(f"Error saving data to file: {e}")
+    #
+    # def set_start_h(self, start_hour):
+    #     for slot in self.slots:
+    #         slot.start_time = f"{start_hour:02}:00:00"
+    #
+    # def set_end_h(self, end_hour):
+    #     for slot in self.slots:
+    #         end_time = datetime.strptime(slot.start_time, "%H:%M:%S") + timedelta(hours=end_hour)
+    #         slot.start_time = end_time.strftime("%H:%M:%S")
+    #
+    # def set_slot_duration(self, duration_minutes):
+    #     self.slot_duration = timedelta(minutes=duration_minutes)
+    #
+    # def set_break(self, start_hour, duration_minutes):
+    #     break_slot = Slot("", f"{start_hour:02}:00:00", timedelta(minutes=duration_minutes))
+    #     self.slots.append(break_slot)
+    #
+    # def generate_new_slots(self, start_hour, end_hour, pause=False):
+    #     new_slots = []
+    #     for slot in self.slots:
+    #         current_time = datetime.strptime(slot.start_time, "%H:%M:%S")
+    #         while current_time.hour < end_hour:
+    #             new_slots.append(Slot(slot.date, current_time.strftime("%H:%M:%S"), self.slot_duration))
+    #             current_time += self.slot_duration
+    #     self.slots = new_slots
 
 class Academic():
     def __init__(self, name):
         self.name = name
 
 
-class Population():
-    def __init__(self, pop_size, defense_terms_list):
-        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(defense_terms_list)) for _ in
-                                  range(pop_size)]
+import random
 
-    def generate_random_sequence(self, defense_terms_list):
-        return random.sample(defense_terms_list, len(defense_terms_list))
+class Population():
+    def __init__(self, pop_size, slots, defenses):
+        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in range(pop_size)]
+
+    def generate_random_sequence(self, slots, defenses):
+        return [DefenseTerm(random.choice(defenses.defense_list), random.choice(slots.slots)) for _ in range(min(len(defenses.defense_list), len(slots.slots)))]
 
     def mutate(self, defense_terms_list):
         mutated_sequence = defense_terms_list.copy()
@@ -250,4 +240,36 @@ class Population():
         return child1, child2
 
     def calculate_fitness(self):
-        fitnes = [self.defense_terms_pop[i].fitness() for i in range(len(self.defense_terms_pop))]
+        fitness = [self.defense_terms_pop[i].fitness() for i in range(len(self.defense_terms_pop))]
+        return fitness
+
+    def evolutionary_method(self, generations):
+        for generation in range(generations):
+            # Calculate fitness for the current population
+            fitness_scores = self.calculate_fitness()
+
+            # Find the index of the best-rated individual
+            best_index = fitness_scores.index(max(fitness_scores))
+
+            # Create a copy of the best individual to preserve it
+            best_individual = self.defense_terms_pop[best_index]
+
+            # Generate a new population through mutation and crossover
+            new_population = [best_individual]
+            for _ in range(len(self.defense_terms_pop) - 1):
+                if random.random() < 0.5:
+                    # Mutate
+                    mutated_individual = self.mutate(best_individual.defenses_terms)
+                    new_population.append(DefensesTermsList(mutated_individual))
+                else:
+                    # Crossover
+                    parent1 = random.choice(self.defense_terms_pop)
+                    parent2 = random.choice(self.defense_terms_pop)
+                    child1, child2 = self.cross(parent1, parent2)
+                    new_population.extend([child1, child2])
+
+            # Update the population with the new one
+            self.defense_terms_pop = new_population
+
+        # Return the best-rated population
+        return self.defense_terms_pop[best_index]
