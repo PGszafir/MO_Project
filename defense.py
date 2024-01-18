@@ -113,13 +113,10 @@ class DefensesTermsList():
         # for term in self.defenses_terms:
         #     if term.defense.promoter is not None:
         #         mix_value += term.defense.promoter.coefficient * term.defense.promoter.factor
-        #
         #     if term.defense.reviewer is not None:
         #         mix_value += term.defense.reviewer.coefficient * term.defense.reviewer.factor
-        #
         # for i in range(1, len(self.defenses_terms)):
         #     distances.append(abs(i - (i - 1)))
-        #
         # mix_value += sum(distances)
 
         return mix_value
@@ -182,45 +179,6 @@ class SlotsList:
             print(f"Error loading slots from file: {e}")
 
         return slots
-
-    # def save_data_to_file(self):
-    #     try:
-    #         workbook = openpyxl.Workbook()
-    #         sheet = workbook.active
-    #         sheet.append(['Date', 'Start Time', 'Duration'])
-    #
-    #         for slot in self.slots:
-    #             sheet.append([slot.date, slot.start_time, slot.duration])
-    #
-    #         workbook.save(self.filename)
-    #
-    #     except Exception as e:
-    #         print(f"Error saving data to file: {e}")
-    #
-    # def set_start_h(self, start_hour):
-    #     for slot in self.slots:
-    #         slot.start_time = f"{start_hour:02}:00:00"
-    #
-    # def set_end_h(self, end_hour):
-    #     for slot in self.slots:
-    #         end_time = datetime.strptime(slot.start_time, "%H:%M:%S") + timedelta(hours=end_hour)
-    #         slot.start_time = end_time.strftime("%H:%M:%S")
-    #
-    # def set_slot_duration(self, duration_minutes):
-    #     self.slot_duration = timedelta(minutes=duration_minutes)
-    #
-    # def set_break(self, start_hour, duration_minutes):
-    #     break_slot = Slot("", f"{start_hour:02}:00:00", timedelta(minutes=duration_minutes))
-    #     self.slots.append(break_slot)
-    #
-    # def generate_new_slots(self, start_hour, end_hour, pause=False):
-    #     new_slots = []
-    #     for slot in self.slots:
-    #         current_time = datetime.strptime(slot.start_time, "%H:%M:%S")
-    #         while current_time.hour < end_hour:
-    #             new_slots.append(Slot(slot.date, current_time.strftime("%H:%M:%S"), self.slot_duration))
-    #             current_time += self.slot_duration
-    #     self.slots = new_slots
 
 class WishList():
     def __init__(self, filename):
@@ -338,7 +296,8 @@ class Population():
             best_individual = self.defense_terms_pop[best_index]
 
             # Print the progress of the current generation
-            print(f"Generation {generation + 1}: Best Fitness = {max(fitness_scores)}")
+            print(f"Generation {generation + 1}: Best Fitness = {max(fitness_scores)}", " population size",
+                  len(self.defense_terms_pop))
 
             # Generate a new population through mutation and crossover
             new_population = [best_individual]
@@ -354,12 +313,15 @@ class Population():
                     child1, child2 = self.cross(parent1, parent2, self.slots)
                     new_population.extend([child1, child2])
 
+            # Trim the new population to maintain the original population size
+            new_population = new_population[:len(self.defense_terms_pop)]
+
             # Update the population with the new one
             self.defense_terms_pop = new_population
 
         # Return the best-rated population
         best_individual = self.defense_terms_pop[best_index]
-        print(f"Evolution finished. Best Fitness = {best_individual.fitness()}")
+        print(f"Evolution finished. Best Fitness = {best_individual.fitness(self.wish_list)}")
         return best_individual
 
 
