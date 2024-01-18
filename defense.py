@@ -106,20 +106,33 @@ class DefensesTermsList():
         df['Date'] = pd.to_datetime(df['Date'])
         df.to_excel(filename, index=False)
 
-    def mix_value(self): # todo: implement
+    def mix_value(self):
         mix_value = 0
-        # distances = []
-        #
-        # for term in self.defenses_terms:
-        #     if term.defense.promoter is not None:
-        #         mix_value += term.defense.promoter.coefficient * term.defense.promoter.factor
-        #     if term.defense.reviewer is not None:
-        #         mix_value += term.defense.reviewer.coefficient * term.defense.reviewer.factor
-        # for i in range(1, len(self.defenses_terms)):
-        #     distances.append(abs(i - (i - 1)))
-        # mix_value += sum(distances)
 
+        # Calculate points for consecutive sequences of the same promoter
+        promoter_sequences = self.calculate_consecutive_sequences([term.defense.promoter for term in self.defenses_terms])
+        for length in promoter_sequences:
+            mix_value += 10 * length - length**2
+
+        # Calculate points for consecutive sequences of the same reviewer
+        reviewer_sequences = self.calculate_consecutive_sequences([term.defense.reviewer for term in self.defenses_terms])
+        for length in reviewer_sequences:
+            mix_value += 10 * length - length**2
         return mix_value
+
+    def calculate_consecutive_sequences(self, academic_list):
+        consecutive_sequences = []
+        current_length = 1
+
+        for i in range(1, len(academic_list)):
+            if academic_list[i] == academic_list[i - 1]:
+                current_length += 1
+            else:
+                consecutive_sequences.append(current_length)
+                current_length = 1
+
+        consecutive_sequences.append(current_length)  # Include the last sequence
+        return consecutive_sequences
 
     def correction_score(self):
         points = 0
@@ -268,7 +281,7 @@ class Population():
 
         return mutated_sequence
 
-    def cross(self, parent1, parent2, slots):
+    def cross(self, parent1, parent2, slots):# todo: should probably work better
         crossover_point = random.randint(1, len(parent1.defenses_terms) - 1)
         child1 = DefensesTermsList(parent1.defenses_terms[:crossover_point] + parent2.defenses_terms[crossover_point:])
         child2 = DefensesTermsList(parent2.defenses_terms[:crossover_point] + parent1.defenses_terms[crossover_point:])
@@ -277,51 +290,54 @@ class Population():
         for i in range(len(child1.defenses_terms)):
             child1.defenses_terms[i].slot = random.choice(slots.slots)
             child2.defenses_terms[i].slot = random.choice(slots.slots)
-
+        #child1,child2 = parent1, parent2
         return child1, child2
 
     def calculate_fitness(self):
         fitness = [self.defense_terms_pop[i].fitness(self.wish_list) for i in range(len(self.defense_terms_pop))]
         return fitness
 
-    def evolutionary_method(self, generations):
+    def evolutionary_method(self, generations, top_percentage=0.5, elite_percentage=0.1):
         for generation in range(generations):
             # Calculate fitness for the current population
             fitness_scores = self.calculate_fitness()
 
-            # Find the index of the best-rated individual
-            best_index = fitness_scores.index(max(fitness_scores))
+            # Find the index of the best-rated individuals
+            sorted_indices = sorted(range(len(fitness_scores)), key=lambda k: fitness_scores[k], reverse=True)
 
-            # Create a copy of the best individual to preserve it
-            best_individual = self.defense_terms_pop[best_index]
+            # Select the top 10% of indices
+            top_indices = sorted_indices[:int(top_percentage * len(fitness_scores))]
+
+            # Select the elite 10% of indices
+            elite_indices = sorted_indices[:int(elite_percentage * len(fitness_scores))]
+
+            # Create a copy of the best individuals to preserve them
+            elite_individuals = [self.defense_terms_pop[i] for i in elite_indices]
 
             # Print the progress of the current generation
-            print(f"Generation {generation + 1}: Best Fitness = {max(fitness_scores)}", " population size",
-                  len(self.defense_terms_pop))
+            print(
+                f"Generation {generation + 1}: Best Fitness = {fitness_scores[sorted_indices[0]]}, Population size = {len(self.defense_terms_pop)}")
 
             # Generate a new population through mutation and crossover
-            new_population = [best_individual]
-            for _ in range(len(self.defense_terms_pop) - 1):
-                if random.random() < 0.5:
+            new_population = elite_individuals[:]
+            for _ in range(len(self.defense_terms_pop) - len(elite_individuals)):
+                if random.random() < 0.7:
                     # Mutate
-                    mutated_individual = self.mutate(best_individual.defenses_terms, self.slots)
+                    mutated_individual = self.mutate(random.choice(elite_individuals).defenses_terms, self.slots)
                     new_population.append(DefensesTermsList(mutated_individual))
                 else:
                     # Crossover
-                    parent1 = random.choice(self.defense_terms_pop)
-                    parent2 = random.choice(self.defense_terms_pop)
+                    parent1 = random.choice(elite_individuals)
+                    parent2 = random.choice(elite_individuals)
                     child1, child2 = self.cross(parent1, parent2, self.slots)
                     new_population.extend([child1, child2])
 
-            # Trim the new population to maintain the original population size
-            new_population = new_population[:len(self.defense_terms_pop)]
-
             # Update the population with the new one
-            self.defense_terms_pop = new_population
+            self.defense_terms_pop = new_population[:len(self.defense_terms_pop)]
 
         # Return the best-rated population
-        best_individual = self.defense_terms_pop[best_index]
-        print(f"Evolution finished. Best Fitness = {best_individual.fitness(self.wish_list)}")
+        best_individual_index = fitness_scores.index(max(fitness_scores))
+        best_individual = self.defense_terms_pop[best_individual_index]
+        print(f"Evolution finished. Best Fitness = {fitness_scores[best_individual_index]}")
         return best_individual
-
 
