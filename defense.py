@@ -1,8 +1,6 @@
-import openpyxl
 import random
-from datetime import datetime, timedelta
 import pandas as pd
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 import openpyxl
 class Defense():
     def __init__(self, surname, name, thesis, degree, form, speciality, promoter, reviewer):
@@ -90,19 +88,25 @@ class DefensesTermsList():
                 f"{term.defense.surname} {term.defense.name} - Date: {term.date}, Hour: {term.hour}, Chairman: {term.chairman}")
 
     def save_to_xlsx(self, filename):
+        # Create a DataFrame with the information about defenses
         data = {
             'Surname': [term.defense.surname for term in self.defenses_terms],
             'Name': [term.defense.name for term in self.defenses_terms],
             'Date': [term.slot.date for term in self.defenses_terms],
             'Hour': [term.slot.hour for term in self.defenses_terms],
             'Chairman': [term.slot.chairman for term in self.defenses_terms],
-            'Promoter':[term.defense.promoter.name for term in self.defenses_terms],
-            'Reviewer':[term.defense.reviewer.name for term in self.defenses_terms]
+            'Promoter': [term.defense.promoter.name for term in self.defenses_terms],
+            'Reviewer': [term.defense.reviewer.name for term in self.defenses_terms]
         }
         df = pd.DataFrame(data)
+
+        # Sort the DataFrame by 'Date' and 'Hour'
+        df['Hour'] = pd.to_datetime(df['Hour'], format='%H:%M:%S').dt.time
+        df = df.sort_values(by=['Date', 'Hour']).reset_index(drop=True)
+        df['Date'] = pd.to_datetime(df['Date'])
         df.to_excel(filename, index=False)
 
-    def mix_value(self):
+    def mix_value(self): # todo: implement
         mix_value = 0
         # distances = []
         #
@@ -145,7 +149,12 @@ class DefensesTermsList():
 
         return points
 
-    def fitness(self):
+    def wishes_score(self, wish_list):
+        conflicts = 0
+        for i in self.defenses_terms:
+            conflicts += wish_list.count_conflicts(i.slot.tate,i.slot.hour,i.slot.hour+i.duration)
+
+    def fitness(self, wish_list):
         value = 0
         value += self.mix_value()
         value += self.correction_score()
@@ -213,6 +222,64 @@ class SlotsList:
     #             current_time += self.slot_duration
     #     self.slots = new_slots
 
+class WishList():
+    def __init__(self, filename):
+        self.wishlist = self.load_from_file(filename)
+
+    def __getitem__(self, index):
+        return self.wishlist[index]
+
+    def load_from_file(self, filename):
+        workbook = openpyxl.load_workbook(filename)
+        sheet = workbook.active
+
+        wishlist = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            academic_name, date, start_time, end_time = row[:4]
+
+            # Create Academic object
+            academic = Academic(academic_name)
+
+            # Create Wish object and add it to the wishlist
+            wish = Wish(academic, date, start_time, end_time)
+            wishlist.append(wish)
+
+        return wishlist
+
+    def count_conflicts(self,date, start_time, end_time):
+        counter = 0
+        for i in self.wishlist:
+            if i.check_availability(date, start_time, end_time):
+                counter += 1
+
+        return counter
+
+
+class Wish():
+    def __init__(self, academic, date, start_hour, end_hour):
+        self.academic = academic
+        self.date = date
+        self.start_hour = start_hour
+        self.end_hour = end_hour
+
+    def check_availability(self, wish_date, wish_start_time, wish_end_time):
+        # Convert wish and stored start/end times to datetime objects
+        start_datetime_str = f"{self.date} {self.start_hour}"
+        end_datetime_str = f"{self.date} {self.end_hour}"
+        start_datetime = datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M")
+        end_datetime = datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M")
+
+        wish_start_datetime = datetime.strptime(f"{wish_date} {wish_start_time}", "%Y-%m-%d %H:%M")
+        wish_end_datetime = datetime.strptime(f"{wish_date} {wish_end_time}", "%Y-%m-%d %H:%M")
+
+        # Check if the wish is available
+        if (start_datetime is None or end_datetime is None or
+                not (start_datetime <= wish_start_datetime <= end_datetime) or
+                not (wish_end_datetime <= start_datetime or wish_start_datetime >= end_datetime)):
+            return False  # The wish is available
+        else:
+            return True  # The wish is not available
+
 class Academic():
     def __init__(self, name):
         self.name = name
@@ -224,11 +291,11 @@ import random
 
 
 class Population():
-    def __init__(self, pop_size, slots, defenses):
+    def __init__(self, pop_size, slots, defenses,wish_list):
         self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in
                                   range(pop_size)]
         self.slots = slots
-
+        self.wish_list = wish_list
     def generate_random_sequence(self, slots, defenses):
         return [DefenseTerm(random.choice(defenses.defense_list), random.choice(slots.slots)) for _ in
                 range(min(len(defenses.defense_list), len(slots.slots)))]
@@ -256,7 +323,7 @@ class Population():
         return child1, child2
 
     def calculate_fitness(self):
-        fitness = [self.defense_terms_pop[i].fitness() for i in range(len(self.defense_terms_pop))]
+        fitness = [self.defense_terms_pop[i].fitness(self.wish_list) for i in range(len(self.defense_terms_pop))]
         return fitness
 
     def evolutionary_method(self, generations):
@@ -269,6 +336,9 @@ class Population():
 
             # Create a copy of the best individual to preserve it
             best_individual = self.defense_terms_pop[best_index]
+
+            # Print the progress of the current generation
+            print(f"Generation {generation + 1}: Best Fitness = {max(fitness_scores)}")
 
             # Generate a new population through mutation and crossover
             new_population = [best_individual]
@@ -288,5 +358,8 @@ class Population():
             self.defense_terms_pop = new_population
 
         # Return the best-rated population
-        return self.defense_terms_pop[best_index]
+        best_individual = self.defense_terms_pop[best_index]
+        print(f"Evolution finished. Best Fitness = {best_individual.fitness()}")
+        return best_individual
+
 

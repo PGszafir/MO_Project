@@ -11,9 +11,9 @@ defenses = DefenseList('data.xlsx')
 slots = SlotsList('slots.xlsx')
 wishlist = WishList('wish_list.xlsx')
 
-population = Population(100,slots, defenses)
+population = Population(30,slots, defenses,wishlist)
 
-best_pop = population.evolutionary_method(10)
+best_pop = population.evolutionary_method(100)
 
 best_pop.save_to_xlsx('results.xlsx')
 
