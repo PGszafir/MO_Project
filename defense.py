@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import openpyxl
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
 class Defense():
     def __init__(self, surname, name, thesis, degree, form, speciality, promoter, reviewer):
@@ -159,18 +160,19 @@ class DefensesTermsList():
             # Sprawdzanie kolidujących obron i przyznawanie punktów
             points -= hall_colisions  # Minus za kolidujące sale
             points -= person_colisions  # Minus za kolidujące osoby
-
         return points
 
     def wishes_score(self, wish_list):
         conflicts = 0
         for i in self.defenses_terms:
-            conflicts += wish_list.count_conflicts(i.slot.tate,i.slot.hour,i.slot.hour+i.duration)
+            conflicts += wish_list.count_conflicts(i.slot.date, i.slot.hour, i.slot.hour)#add minutes into end time
+        return conflicts
 
     def fitness(self, wish_list):
         value = 0
         value += self.mix_value()
         value += self.correction_score()
+        value -= self.wishes_score(wish_list)
         return value
 
 
@@ -229,6 +231,8 @@ class WishList():
         return counter
 
 
+from datetime import datetime, timedelta
+
 class Wish():
     def __init__(self, academic, date, start_hour, end_hour):
         self.academic = academic
@@ -237,22 +241,23 @@ class Wish():
         self.end_hour = end_hour
 
     def check_availability(self, wish_date, wish_start_time, wish_end_time):
-        # Convert wish and stored start/end times to datetime objects
-        start_datetime_str = f"{self.date} {self.start_hour}"
-        end_datetime_str = f"{self.date} {self.end_hour}"
-        start_datetime = datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M")
-        end_datetime = datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M")
-
-        wish_start_datetime = datetime.strptime(f"{wish_date} {wish_start_time}", "%Y-%m-%d %H:%M")
-        wish_end_datetime = datetime.strptime(f"{wish_date} {wish_end_time}", "%Y-%m-%d %H:%M")
+        # Convert wish and stored start/end times to timestamp
+        # start_datetime_str = f"{self.date} {self.start_hour}"
+        # end_datetime_str = f"{self.date} {self.end_hour}"
+        # start_timestamp = int(datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M:%S").timestamp())
+        # end_timestamp = int(datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M").timestamp())
+        #
+        # wish_start_timestamp = int(datetime.strptime(f"{wish_date} {wish_start_time}", "%Y-%m-%d %H:%M").timestamp())
+        # wish_end_timestamp = int(datetime.strptime(f"{wish_date} {wish_end_time}", "%Y-%m-%d %H:%M").timestamp())
 
         # Check if the wish is available
-        if (start_datetime is None or end_datetime is None or
-                not (start_datetime <= wish_start_datetime <= end_datetime) or
-                not (wish_end_datetime <= start_datetime or wish_start_datetime >= end_datetime)):
-            return False  # The wish is available
-        else:
-            return True  # The wish is not available
+        # if (start_timestamp is None or end_timestamp is None or
+        #         not (start_timestamp <= wish_start_timestamp <= end_timestamp) or
+        #         not (wish_end_timestamp <= start_timestamp or wish_start_timestamp >= end_timestamp)):
+        #     return False  # The wish is available
+        # else:
+        #     return True  # The wish is not available
+        return False
 
 class Academic():
     def __init__(self, name):
