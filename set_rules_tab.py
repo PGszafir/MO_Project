@@ -2,7 +2,7 @@ from wish_list import *
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
-class SetRulesTab:
+class SetRulesTab:# to do add chairman into slots
     def __init__(self, tab, slots_list):
         self.tab = tab
         self.slots_list = slots_list

@@ -20,10 +20,24 @@ class Slot():
         self.duration = duration
 
 class DefenseTerm():
-    def __init__(self, defense, slot, chairman):
+    def __init__(self, defense, slot, chairman, hall_no = 1):
         self.defense = defense
         self.slot = slot
         self.chairman = chairman
+        self.hall = hall_no
+
+    def return_academics(self):
+        return [self.chairman, self.defense.promoter, self.defense.reviewer]
+    def is_academic_in_defense(self,academic):
+        if academic in self.return_academics():
+            return True
+        return False
+    def check_academics_collisions(self,other):
+        colisions = 0
+        for i in other.return_academics():
+            if self.is_academic_in_defense():
+                colisions += 1
+        return colisions
 
 class DefenseList():
     def __init__(self, filename):
@@ -65,6 +79,7 @@ class DefenseList():
 
         return academics_list, defense_list
 
+import pandas as pd
 
 class DefensesTermsList():
     def __init__(self, defenses_terms):
@@ -74,11 +89,70 @@ class DefensesTermsList():
         for term in self.defenses_terms:
             print(
                 f"{term.defense.surname} {term.defense.name} - Date: {term.date}, Hour: {term.hour}, Chairman: {term.chairman}")
-        # Add more attributes as needed
 
     def save_to_xlsx(self, filename):
-        # Implement saving to Excel
-        pass
+        # Utwórz DataFrame z informacjami o obronach
+        data = {
+            'Surname': [term.defense.surname for term in self.defenses_terms],
+            'Name': [term.defense.name for term in self.defenses_terms],
+            'Date': [term.date for term in self.defenses_terms],
+            'Hour': [term.hour for term in self.defenses_terms],
+            'Chairman': [term.chairman for term in self.defenses_terms]
+        }
+        df = pd.DataFrame(data)
+
+        # Zapisz DataFrame do pliku Excel
+        df.to_excel(filename, index=False)
+
+    def mix_value(self):
+        mix_value = 0
+        distances = []
+
+        for term in self.defenses_terms:
+            if term.defense.promoter is not None:
+                mix_value += term.defense.promoter.coefficient * term.defense.promoter.factor
+
+            if term.defense.reviewer is not None:
+                mix_value += term.defense.reviewer.coefficient * term.defense.reviewer.factor
+
+        for i in range(1, len(self.defenses_terms)):
+            distances.append(abs(i - (i - 1)))
+
+        mix_value += sum(distances)
+
+        return mix_value
+
+    def correction_score(self):
+        points = 0
+
+        for term in self.defenses_terms:
+            # Sprawdzenie czy przewodniczący nie zajmuje innej pozycji
+            if term.chairman == term.defense.promoter or term.chairman == term.defense.reviewer:
+                points -= 1  # Minus za złe przypisanie przewodniczącego
+            else:
+                points += 1  # Plus za poprawne przypisanie przewodniczącego
+
+            hall_colisions = -1
+            person_colisions = -1
+            for i in range(len(self.defenses_terms)):
+                if term.date == self.defenses_terms[i].date:
+                    if term.hour == self.defenses_terms[i].hour:
+                        if term.hall == self.defenses_terms[i].hall:
+                            hall_colisions += 1
+                        person_colisions += term.check_academics_collisions(self.defenses_terms[i])
+
+            # Sprawdzanie kolidujących obron i przyznawanie punktów
+            points -= hall_colisions  # Minus za kolidujące sale
+            points -= person_colisions  # Minus za kolidujące osoby
+
+        return points
+
+    def fitness(self):
+        value = 0
+        value += self.mix_value()
+        value += self.correction_score()
+        return value
+
 
 from datetime import timedelta, datetime
 import openpyxl
@@ -175,3 +249,5 @@ class Population():
         child2 = DefensesTermsList(parent2.defenses_terms[:crossover_point] + parent1.defenses_terms[crossover_point:])
         return child1, child2
 
+    def calculate_fitness(self):
+        fitnes = [self.defense_terms_pop[i].fitness() for i in range(len(self.defense_terms_pop))]

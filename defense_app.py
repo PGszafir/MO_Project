@@ -1,6 +1,7 @@
 
 from defense import *
 from wish_list import *
+from generate_results_tab import *
 from set_rules_tab import *
 class DefenseApp:
     def __init__(self, master):
@@ -119,6 +120,7 @@ class DefenseApp:
         self.tab3.rowconfigure(2, weight=1, minsize=50)
         # Tab 2 - Set Rules
         self.set_rules_tab = SetRulesTab(self.tab2, SlotsList("slots.xlsx"))
+        self.generate_results_tab = GenerateResultsTab(self.tab3, Population(10, []))
     def browse_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
         self.file_var.set(file_path)
