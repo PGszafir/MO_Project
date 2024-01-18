@@ -174,6 +174,8 @@ class DefensesTermsList():
         value += self.correction_score()
         value -= self.wishes_score(wish_list)
         return value
+    def print_conflicts(self):
+        print("conflicts evaluation:",self.correction_score())
 
 
 class SlotsList:
@@ -269,18 +271,22 @@ import random
 import random
 
 
-class Population():
-    def __init__(self, pop_size, slots, defenses,wish_list):
-        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in
-                                  range(pop_size)]
+import copy
+import random
+import matplotlib.pyplot as plt
+
+class Population:
+    def __init__(self, pop_size, slots, defenses, wish_list):
+        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in range(pop_size)]
         self.slots = slots
         self.wish_list = wish_list
+
     def generate_random_sequence(self, slots, defenses):
         return [DefenseTerm(random.choice(defenses.defense_list), random.choice(slots.slots)) for _ in
                 range(min(len(defenses.defense_list), len(slots.slots)))]
 
     def mutate(self, defense_terms_list, slots):
-        mutated_sequence = defense_terms_list.copy()
+        mutated_sequence = copy.deepcopy(defense_terms_list)
         index1, index2 = random.sample(range(len(mutated_sequence)), 2)
 
         # Swap slots in the mutated sequence
@@ -289,7 +295,7 @@ class Population():
 
         return mutated_sequence
 
-    def cross(self, parent1, parent2, slots):# todo: should probably work better
+    def cross(self, parent1, parent2, slots):
         crossover_point = random.randint(1, len(parent1.defenses_terms) - 1)
         child1 = DefensesTermsList(parent1.defenses_terms[:crossover_point] + parent2.defenses_terms[crossover_point:])
         child2 = DefensesTermsList(parent2.defenses_terms[:crossover_point] + parent1.defenses_terms[crossover_point:])
@@ -298,80 +304,58 @@ class Population():
         for i in range(len(child1.defenses_terms)):
             child1.defenses_terms[i].slot = random.choice(slots.slots)
             child2.defenses_terms[i].slot = random.choice(slots.slots)
-        #child1,child2 = parent1, parent2
+
         return child1, child2
 
     def calculate_fitness(self):
-        fitness = [self.defense_terms_pop[i].fitness(self.wish_list) for i in range(len(self.defense_terms_pop))]
+        fitness = [individual.fitness(self.wish_list) for individual in self.defense_terms_pop]
         return fitness
 
     def evolutionary_method(self, generations, top_percentage=0.5, elite_percentage=0.1, mutation_rate=0.7):
-        # Initialize a list to store the best individuals over generations
         best_individuals_over_time = []
 
         for generation in range(generations):
-            # Calculate fitness for the current population
             fitness_scores = self.calculate_fitness()
 
-            # Find the index of the best-rated individuals
             sorted_indices = sorted(range(len(fitness_scores)), key=lambda k: fitness_scores[k], reverse=True)
 
-            # Select the top percentage of indices
             top_indices = sorted_indices[:int(top_percentage * len(fitness_scores))]
-
-            # Select the elite percentage of indices
             elite_indices = sorted_indices[:int(elite_percentage * len(fitness_scores))]
 
-            # Create a copy of the best individuals to preserve them
-            elite_individuals = [self.defense_terms_pop[i] for i in elite_indices]
+            elite_individuals = [copy.deepcopy(self.defense_terms_pop[i]) for i in elite_indices]
 
-            # Print the progress of the current generation
-            print(
-                f"Generation {generation + 1}: Best Fitness = {fitness_scores[sorted_indices[0]]}, Population size = {len(self.defense_terms_pop)}")
+            print(f"Generation {generation + 1}: Best Fitness = {fitness_scores[sorted_indices[0]]}, Population size = {len(self.defense_terms_pop)}")
 
-            # Generate a new population through mutation and crossover
             new_population = []
-
-            # Preserve elite individuals without any modification
             new_population.extend(elite_individuals)
 
-            # Apply crossover to create new individuals
             for _ in range(len(self.defense_terms_pop) - len(elite_individuals)):
                 if random.random() < 1 - mutation_rate:
-                    # Crossover
                     parent1 = random.choice(elite_individuals)
                     parent2 = random.choice(elite_individuals)
                     child1, child2 = self.cross(parent1, parent2, self.slots)
-                    new_population.extend([child1, child2])
+                    new_population.extend([copy.deepcopy(child1), copy.deepcopy(child2)])
                 else:
-                    # Mutate
                     mutated_individual = self.mutate(random.choice(elite_individuals).defenses_terms, self.slots)
                     new_population.append(DefensesTermsList(mutated_individual))
 
-            # Update the population with the new one
             self.defense_terms_pop = new_population[:len(self.defense_terms_pop)]
 
-            # Store the best individual of the current generation
             best_individuals_over_time.append(max(self.defense_terms_pop, key=lambda x: x.fitness(self.wish_list)))
 
-        # Return the best-rated population
         best_individual_index = fitness_scores.index(max(fitness_scores))
         best_individual = self.defense_terms_pop[best_individual_index]
         print(f"Evolution finished. Best Fitness = {fitness_scores[best_individual_index]}")
 
-        # Return the best individual globally
         global_best_individual = max(best_individuals_over_time, key=lambda x: x.fitness(self.wish_list))
 
-        # Plot the evolution of fitness over generations
         self.plot_evolution(best_individuals_over_time)
 
         return global_best_individual
 
     def plot_evolution(self, best_individuals_over_time):
-        # Extract fitness values from best individuals
         fitness_values = [individual.fitness(self.wish_list) for individual in best_individuals_over_time]
 
-        # Plotting the evolution of fitness over generations
         plt.plot(range(1, len(best_individuals_over_time) + 1), fitness_values)
         plt.title('Evolution of Fitness Over Generations')
         plt.xlabel('Generation')
