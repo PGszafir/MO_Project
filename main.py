@@ -16,6 +16,6 @@ print("slots list width: ", len(slots.slots))
 print("Defenses list width: ", len(defenses.defense_list))
 
 
-population = Population(3000,slots, defenses,wishlist)
-best_pop = population.evolutionary_method(1)
+population = Population(30,slots, defenses,wishlist)
+best_pop = population.evolutionary_method(30)
 best_pop.save_to_xlsx('results.xlsx')

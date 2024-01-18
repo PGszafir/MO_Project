@@ -2,6 +2,8 @@ import random
 import pandas as pd
 from datetime import datetime, timedelta
 import openpyxl
+import matplotlib.pyplot as plt
+
 class Defense():
     def __init__(self, surname, name, thesis, degree, form, speciality, promoter, reviewer):
         self.surname = surname
@@ -96,7 +98,8 @@ class DefensesTermsList():
             'Hour': [term.slot.hour for term in self.defenses_terms],
             'Chairman': [term.slot.chairman for term in self.defenses_terms],
             'Promoter': [term.defense.promoter.name for term in self.defenses_terms],
-            'Reviewer': [term.defense.reviewer.name for term in self.defenses_terms]
+            'Reviewer': [term.defense.reviewer.name for term in self.defenses_terms],
+            'Hall_no': [term.slot.hall for term in self.defenses_terms]
         }
         df = pd.DataFrame(data)
 
@@ -297,7 +300,10 @@ class Population():
         fitness = [self.defense_terms_pop[i].fitness(self.wish_list) for i in range(len(self.defense_terms_pop))]
         return fitness
 
-    def evolutionary_method(self, generations, top_percentage=0.5, elite_percentage=0.1):
+    def evolutionary_method(self, generations, top_percentage=0.5, elite_percentage=0.1, mutation_rate=0.7):
+        # Initialize a list to store the best individuals over generations
+        best_individuals_over_time = []
+
         for generation in range(generations):
             # Calculate fitness for the current population
             fitness_scores = self.calculate_fitness()
@@ -305,10 +311,10 @@ class Population():
             # Find the index of the best-rated individuals
             sorted_indices = sorted(range(len(fitness_scores)), key=lambda k: fitness_scores[k], reverse=True)
 
-            # Select the top 10% of indices
+            # Select the top percentage of indices
             top_indices = sorted_indices[:int(top_percentage * len(fitness_scores))]
 
-            # Select the elite 10% of indices
+            # Select the elite percentage of indices
             elite_indices = sorted_indices[:int(elite_percentage * len(fitness_scores))]
 
             # Create a copy of the best individuals to preserve them
@@ -319,25 +325,50 @@ class Population():
                 f"Generation {generation + 1}: Best Fitness = {fitness_scores[sorted_indices[0]]}, Population size = {len(self.defense_terms_pop)}")
 
             # Generate a new population through mutation and crossover
-            new_population = elite_individuals[:]
+            new_population = []
+
+            # Preserve elite individuals without any modification
+            new_population.extend(elite_individuals)
+
+            # Apply crossover to create new individuals
             for _ in range(len(self.defense_terms_pop) - len(elite_individuals)):
-                if random.random() < 0.7:
-                    # Mutate
-                    mutated_individual = self.mutate(random.choice(elite_individuals).defenses_terms, self.slots)
-                    new_population.append(DefensesTermsList(mutated_individual))
-                else:
+                if random.random() < 1 - mutation_rate:
                     # Crossover
                     parent1 = random.choice(elite_individuals)
                     parent2 = random.choice(elite_individuals)
                     child1, child2 = self.cross(parent1, parent2, self.slots)
                     new_population.extend([child1, child2])
+                else:
+                    # Mutate
+                    mutated_individual = self.mutate(random.choice(elite_individuals).defenses_terms, self.slots)
+                    new_population.append(DefensesTermsList(mutated_individual))
 
             # Update the population with the new one
             self.defense_terms_pop = new_population[:len(self.defense_terms_pop)]
+
+            # Store the best individual of the current generation
+            best_individuals_over_time.append(max(self.defense_terms_pop, key=lambda x: x.fitness(self.wish_list)))
 
         # Return the best-rated population
         best_individual_index = fitness_scores.index(max(fitness_scores))
         best_individual = self.defense_terms_pop[best_individual_index]
         print(f"Evolution finished. Best Fitness = {fitness_scores[best_individual_index]}")
-        return best_individual
 
+        # Return the best individual globally
+        global_best_individual = max(best_individuals_over_time, key=lambda x: x.fitness(self.wish_list))
+
+        # Plot the evolution of fitness over generations
+        self.plot_evolution(best_individuals_over_time)
+
+        return global_best_individual
+
+    def plot_evolution(self, best_individuals_over_time):
+        # Extract fitness values from best individuals
+        fitness_values = [individual.fitness(self.wish_list) for individual in best_individuals_over_time]
+
+        # Plotting the evolution of fitness over generations
+        plt.plot(range(1, len(best_individuals_over_time) + 1), fitness_values)
+        plt.title('Evolution of Fitness Over Generations')
+        plt.xlabel('Generation')
+        plt.ylabel('Fitness')
+        plt.show()
