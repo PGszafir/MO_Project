@@ -13,3 +13,7 @@ wishlist = WishList('wish_list.xlsx')
 
 population = Population(100,slots, defenses)
 
+best_pop = population.evolutionary_method(10)
+
+best_pop.save_to_xlsx('results.xlsx')
+

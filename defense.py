@@ -93,30 +93,30 @@ class DefensesTermsList():
         data = {
             'Surname': [term.defense.surname for term in self.defenses_terms],
             'Name': [term.defense.name for term in self.defenses_terms],
-            'Date': [term.date for term in self.defenses_terms],
-            'Hour': [term.hour for term in self.defenses_terms],
-            'Chairman': [term.chairman for term in self.defenses_terms],
-            'Promoter':[term.defense.promoter for term in self.defenses_terms],
-            'Reviewer':[term.defense.reviewer for term in self.defenses_terms]
+            'Date': [term.slot.date for term in self.defenses_terms],
+            'Hour': [term.slot.hour for term in self.defenses_terms],
+            'Chairman': [term.slot.chairman for term in self.defenses_terms],
+            'Promoter':[term.defense.promoter.name for term in self.defenses_terms],
+            'Reviewer':[term.defense.reviewer.name for term in self.defenses_terms]
         }
         df = pd.DataFrame(data)
         df.to_excel(filename, index=False)
 
     def mix_value(self):
         mix_value = 0
-        distances = []
-
-        for term in self.defenses_terms:
-            if term.defense.promoter is not None:
-                mix_value += term.defense.promoter.coefficient * term.defense.promoter.factor
-
-            if term.defense.reviewer is not None:
-                mix_value += term.defense.reviewer.coefficient * term.defense.reviewer.factor
-
-        for i in range(1, len(self.defenses_terms)):
-            distances.append(abs(i - (i - 1)))
-
-        mix_value += sum(distances)
+        # distances = []
+        #
+        # for term in self.defenses_terms:
+        #     if term.defense.promoter is not None:
+        #         mix_value += term.defense.promoter.coefficient * term.defense.promoter.factor
+        #
+        #     if term.defense.reviewer is not None:
+        #         mix_value += term.defense.reviewer.coefficient * term.defense.reviewer.factor
+        #
+        # for i in range(1, len(self.defenses_terms)):
+        #     distances.append(abs(i - (i - 1)))
+        #
+        # mix_value += sum(distances)
 
         return mix_value
 
@@ -125,7 +125,7 @@ class DefensesTermsList():
 
         for term in self.defenses_terms:
             # Sprawdzenie czy przewodniczący nie zajmuje innej pozycji
-            if term.chairman == term.defense.promoter or term.chairman == term.defense.reviewer:
+            if term.slot.chairman == term.defense.promoter or term.slot.chairman == term.defense.reviewer:
                 points -= 1  # Minus za złe przypisanie przewodniczącego
             else:
                 points += 1  # Plus za poprawne przypisanie przewodniczącego
@@ -133,9 +133,9 @@ class DefensesTermsList():
             hall_colisions = -1
             person_colisions = -1
             for i in range(len(self.defenses_terms)):
-                if term.date == self.defenses_terms[i].date:
-                    if term.hour == self.defenses_terms[i].hour:
-                        if term.hall == self.defenses_terms[i].hall:
+                if term.slot.date == self.defenses_terms[i].slot.date:
+                    if term.slot.hour == self.defenses_terms[i].slot.hour:
+                        if term.slot.hall == self.defenses_terms[i].slot.hall:
                             hall_colisions += 1
                         person_colisions += term.check_academics_collisions(self.defenses_terms[i])
 
@@ -220,23 +220,39 @@ class Academic():
 
 import random
 
+import random
+
+
 class Population():
     def __init__(self, pop_size, slots, defenses):
-        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in range(pop_size)]
+        self.defense_terms_pop = [DefensesTermsList(self.generate_random_sequence(slots, defenses)) for _ in
+                                  range(pop_size)]
+        self.slots = slots
 
     def generate_random_sequence(self, slots, defenses):
-        return [DefenseTerm(random.choice(defenses.defense_list), random.choice(slots.slots)) for _ in range(min(len(defenses.defense_list), len(slots.slots)))]
+        return [DefenseTerm(random.choice(defenses.defense_list), random.choice(slots.slots)) for _ in
+                range(min(len(defenses.defense_list), len(slots.slots)))]
 
-    def mutate(self, defense_terms_list):
+    def mutate(self, defense_terms_list, slots):
         mutated_sequence = defense_terms_list.copy()
         index1, index2 = random.sample(range(len(mutated_sequence)), 2)
-        mutated_sequence[index1], mutated_sequence[index2] = mutated_sequence[index2], mutated_sequence[index1]
+
+        # Swap slots in the mutated sequence
+        mutated_sequence[index1].slot = random.choice(slots.slots)
+        mutated_sequence[index2].slot = random.choice(slots.slots)
+
         return mutated_sequence
 
-    def cross(self, parent1, parent2):
+    def cross(self, parent1, parent2, slots):
         crossover_point = random.randint(1, len(parent1.defenses_terms) - 1)
         child1 = DefensesTermsList(parent1.defenses_terms[:crossover_point] + parent2.defenses_terms[crossover_point:])
         child2 = DefensesTermsList(parent2.defenses_terms[:crossover_point] + parent1.defenses_terms[crossover_point:])
+
+        # Swap slots in the crossover children
+        for i in range(len(child1.defenses_terms)):
+            child1.defenses_terms[i].slot = random.choice(slots.slots)
+            child2.defenses_terms[i].slot = random.choice(slots.slots)
+
         return child1, child2
 
     def calculate_fitness(self):
@@ -259,13 +275,13 @@ class Population():
             for _ in range(len(self.defense_terms_pop) - 1):
                 if random.random() < 0.5:
                     # Mutate
-                    mutated_individual = self.mutate(best_individual.defenses_terms)
+                    mutated_individual = self.mutate(best_individual.defenses_terms, self.slots)
                     new_population.append(DefensesTermsList(mutated_individual))
                 else:
                     # Crossover
                     parent1 = random.choice(self.defense_terms_pop)
                     parent2 = random.choice(self.defense_terms_pop)
-                    child1, child2 = self.cross(parent1, parent2)
+                    child1, child2 = self.cross(parent1, parent2, self.slots)
                     new_population.extend([child1, child2])
 
             # Update the population with the new one
@@ -273,3 +289,4 @@ class Population():
 
         # Return the best-rated population
         return self.defense_terms_pop[best_index]
+
